@@ -3,6 +3,7 @@
 ## How to work in this repository
 
 - Before changing code, inspect the existing structure, naming, dependencies, tests, and build commands.
+- Read `ARCHITECTURE.md` before changing workflow boundaries, agent responsibilities, state transitions, or quality gates. Update it in the same change when those contracts change.
 - Prefer the smallest coherent change that solves the request. Preserve existing public APIs unless the task explicitly requires a breaking change.
 - Explain the plan briefly before implementing a non-trivial change, then implement it and run the most relevant checks.
 - Do not claim a check passed unless it was actually run. Report skipped checks and the reason.
