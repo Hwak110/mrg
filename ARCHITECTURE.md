@@ -1,23 +1,80 @@
 # mrg 架构
 
-本文档是多智能体工作流的架构基准。流程图描述控制流，后续契约定义实现必须保持的行为。
+本文档是多智能体工作流的架构基准。系统拓扑图描述组件边界和依赖关系，状态图描述运行时流转，后续契约定义实现必须保持的行为。
 
 ## 系统上下文
 
 ```mermaid
-flowchart TD
-    Human[人工审核者] -->|业务需求| Planner[规划智能体]
-    Planner -->|编写并验证规格| Spec[(spec.md)]
-    Spec -->|只读输入| Coder[编码智能体]
-    Coder -->|修改实现| Source[(源代码目录)]
-    Source -->|只读审核输入| Evaluator[评估智能体]
-    Spec -->|验收标准| Evaluator
-    Evaluator -->|运行测试与静态检查| Decision{质量门禁}
-    Decision -->|失败并给出可执行的问题说明| Feedback[(review-feedback.md)]
-    Feedback -->|进入下一轮修改| Coder
-    Decision -->|通过| PullRequest[草稿 Pull Request]
-    PullRequest -->|审核与批准| Human
+%%{init: {"flowchart": {"curve": "stepAfter", "nodeSpacing": 40, "rankSpacing": 55}}}%%
+graph TB
+    subgraph HUMAN_DOMAIN["人工审核与最终决策域"]
+        direction LR
+        Human["Human<br/>人工审核者"]
+    end
+
+    subgraph CONTROL_PLANE["mrg 核心控制面"]
+        direction LR
+        Scheduler["Scheduler<br/>调度器"]
+        StateDB[("State DB<br/>状态与执行记录")]
+    end
+
+    subgraph AGENT_SANDBOXES["Multi-Agent 隔离执行边界"]
+        direction LR
+        Planner["Planner<br/>规划智能体"]
+        Coder["Coder<br/>编码智能体"]
+        Evaluator["Evaluator<br/>评估智能体"]
+    end
+
+    subgraph ARTIFACTS_ZONE["静态契约与过程产物区"]
+        direction LR
+        Spec[("spec.md<br/>任务规格")]
+        Feedback[("review-feedback.md<br/>评估反馈")]
+        PullRequest["Draft Pull Request<br/>待审版本"]
+    end
+
+    subgraph RUNTIME_ENVIRONMENT["源码与验证环境"]
+        direction LR
+        SourceCode[("Source Code<br/>源代码目录")]
+        QualityGate{"Quality Gate<br/>质量门禁"}
+    end
+
+    Human ==>|"下发任务"| Scheduler
+    Scheduler ---|"持久化状态"| StateDB
+
+    Scheduler -->|"调度"| Planner
+    Scheduler -->|"调度"| Coder
+    Scheduler -->|"调度"| Evaluator
+
+    Planner -->|"写入规格"| Spec
+    Spec -.->|"只读实现契约"| Coder
+    Spec -.->|"只读验收标准"| Evaluator
+
+    Coder -->|"修改"| SourceCode
+    Evaluator -.->|"只读检查"| SourceCode
+    Evaluator -->|"提交检查结果"| QualityGate
+
+    QualityGate -->|"FAIL"| Feedback
+    Feedback -.->|"只读修复依据"| Coder
+    QualityGate -->|"PASS"| PullRequest
+    PullRequest ==>|"审核与批准"| Human
+
+    classDef default fill:#ffffff,stroke:#18181b,stroke-width:1.5px,color:#18181b;
+    classDef control fill:#f4f4f5,stroke:#18181b,stroke-width:2px,color:#18181b;
+    classDef artifact fill:#fafafa,stroke:#52525b,stroke-width:1.5px,color:#18181b;
+    classDef gate fill:#ffffff,stroke:#18181b,stroke-width:2px,color:#18181b;
+
+    class Scheduler,StateDB control;
+    class Spec,Feedback,PullRequest,SourceCode artifact;
+    class QualityGate gate;
+
+    style HUMAN_DOMAIN fill:#fafafa,stroke:#a1a1aa,stroke-width:1px
+    style CONTROL_PLANE fill:#ffffff,stroke:#27272a,stroke-width:2px,stroke-dasharray:4 4
+    style AGENT_SANDBOXES fill:#ffffff,stroke:#27272a,stroke-width:2px,stroke-dasharray:4 4
+    style ARTIFACTS_ZONE fill:#fafafa,stroke:#a1a1aa,stroke-width:1px
+    style RUNTIME_ENVIRONMENT fill:#fafafa,stroke:#a1a1aa,stroke-width:1px
 ```
+
+图中实线表示调度、状态变更或产物写入，虚线表示只读依赖，粗线表示需要人工参与的决策边界。隔离执行边界表达职责与上下文隔离；实际部署是否采用进程、容器或其他沙箱机制，由后续实现决定。
 
 ## 工作流状态
 
