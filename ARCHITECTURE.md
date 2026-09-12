@@ -51,7 +51,7 @@ stateDiagram-v2
 ### 编码智能体
 
 - 将已接受的 `spec.md` 作为实现契约。
-- 只修改规格要求的文件，并遵守 `.github/copilot-instructions.md`。
+- 只修改规格要求的文件，并遵守 `skills/architecture-first-engineering/SKILL.md`。
 - 执行验证方案中指定的检查，并记录命令结果。
 - 不得为了获得通过结果而削弱测试或质量门禁。
 
