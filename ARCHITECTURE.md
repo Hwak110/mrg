@@ -46,17 +46,17 @@ graph TB
     Scheduler -->|"调度"| Evaluator
 
     Planner -->|"写入规格"| Spec
-    Spec -.->|"只读实现契约"| Coder
-    Spec -.->|"只读验收标准"| Evaluator
+    Coder -.->|"读取实现契约"| Spec
+    Evaluator -.->|"读取验收标准"| Spec
 
     Coder -->|"修改"| SourceCode
     Evaluator -.->|"只读检查"| SourceCode
     Evaluator -->|"提交检查结果"| QualityGate
 
     QualityGate -->|"FAIL"| Feedback
-    Feedback -.->|"只读修复依据"| Coder
+    Coder -.->|"读取修复依据"| Feedback
     QualityGate -->|"PASS"| PullRequest
-    PullRequest ==>|"审核与批准"| Human
+    Human ==>|"审核与批准"| PullRequest
 
     classDef default fill:#ffffff,stroke:#18181b,stroke-width:1.5px,color:#18181b;
     classDef control fill:#f4f4f5,stroke:#18181b,stroke-width:2px,color:#18181b;
