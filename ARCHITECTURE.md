@@ -1,38 +1,39 @@
 # MRG 架构
 
-## 定位
+## 研究对象
 
-MRG 是 **Minimal Engineering Context for LLM**：给模型问题、代码、工具和必要上下文，然后尽量不妨碍模型自行完成工程工作。
+MRG 不是流程控制器，也不是 Agent 角色集合。它为模型提供一个完整的软件工程世界：问题、代码、文件系统、Git、终端、构建、测试、架构产物和人类决策。
 
-核心理念：
+模型观察结果、判断下一步、采取行动，再观察结果并继续判断。模型自己决定是否需要计划、规格、评审、额外模型或架构图。
 
-> Less instruction. More capability.
+## 人类边界
 
-## 组成
+人类保留需求和产品取舍、高风险决策、架构方向、不可逆操作，以及模型无法从代码和工具事实中解决的歧义。人类不应成为默认的逐行代码审核器；模型应把工作压缩为人能快速理解的结果：任务、架构变化、关键改动、验证证据、风险和待决策事项。
 
-```text
-mrg/
-├── README.md
-├── ARCHITECTURE.md
-└── skills/
-    └── architecture/
-        └── SKILL.md
+## 工程闭环
+
+```mermaid
+flowchart TD
+    Human[人类意图与决策] --> MRG[MRG：完整工程上下文]
+    MRG --> Model[模型：自行决定如何完成工程]
+    Model --> Code[代码]
+    Model --> Tests[测试与构建]
+    Model --> Diagram[架构图]
+    Code --> Evidence[自动验证证据]
+    Tests --> Evidence
+    Diagram --> Evidence
+    Evidence --> Decision{需要人类决策？}
+    Decision -->|否| Done[完成]
+    Decision -->|是| Human
 ```
 
-仓库只提供一个架构 Skill，覆盖问题理解、架构判断、技术实现、验证和架构图一致性。
+## 实验基线
 
-## 不预设的内容
+Planner、Coder、Evaluator、Quality Gate 流程可以作为第一阶段基线，用来测量减少人工先验后的能力变化。它们不是最终架构；如果模型能自行完成相同闭环，就应撤掉对应的固定角色和规则。
 
-MRG 不强制使用 Planner、Coder、Reviewer、Evaluator 等 Agent 角色，不强制 spec、反馈日志、DAG、设计模式、DDD、Clean Architecture 或某种 Java 风格。
+## 最小上下文原则
 
-这些选择应由模型根据任务、代码事实、风险和人类约束自行判断。
-
-## 运行时边界
-
-运行时提供模型完成工作所需的真实能力：文件系统、Git、终端、构建与测试、源代码和项目上下文、架构产物、人类决策。
-
-模型可以自行决定何时阅读、计划、修改、验证、绘图、回退或询问人类。
-
-## 成功标准
-
-MRG 的目标不是让模型遵循更多规则，而是在足够上下文下观察模型能否正确理解系统、为复杂问题设计合理结构、对简单问题保持简单、将设计自然落到代码，并让架构图与实现保持一致。
+- Skill 越少，人工先验越少，模型自由度越高。
+- Skill 只表达目标、边界和结果，不积累“某个模型常犯什么错”的经验清单。
+- 不强制 DDD、Clean Architecture、Strategy、Factory、Java 风格或固定文档流程。
+- 评估重点是结果质量、验证证据和人类注意力消耗，而不是模型是否遵循预设步骤。
