@@ -1,164 +1,38 @@
-# mrg 架构
+# MRG 架构
 
-本文档是多智能体工作流的架构基准。系统拓扑图描述组件边界和依赖关系，状态图描述运行时流转，后续契约定义实现必须保持的行为。
+## 定位
 
-## 系统上下文
+MRG 是 **Minimal Engineering Context for LLM**：给模型问题、代码、工具和必要上下文，然后尽量不妨碍模型自行完成工程工作。
 
-```mermaid
-%%{init: {"flowchart": {"curve": "stepAfter", "nodeSpacing": 40, "rankSpacing": 55}}}%%
-graph TB
-    subgraph HUMAN_DOMAIN["人工审核与最终决策域"]
-        direction LR
-        Human["Human<br/>人工审核者"]
-    end
+核心理念：
 
-    subgraph CONTROL_PLANE["mrg 核心控制面"]
-        direction LR
-        Scheduler["Scheduler<br/>调度器"]
-        StateDB[("State DB<br/>状态与执行记录")]
-    end
+> Less instruction. More capability.
 
-    subgraph AGENT_SANDBOXES["Multi-Agent 隔离执行边界"]
-        direction LR
-        Planner["Planner<br/>规划智能体"]
-        Coder["Coder<br/>编码智能体"]
-        Evaluator["Evaluator<br/>评估智能体"]
-    end
+## 组成
 
-    subgraph ARTIFACTS_ZONE["静态契约与过程产物区"]
-        direction LR
-        Spec[("spec.md<br/>任务规格")]
-        Feedback[("review-feedback.md<br/>评估反馈")]
-        PullRequest["Draft Pull Request<br/>待审版本"]
-    end
-
-    subgraph RUNTIME_ENVIRONMENT["源码与验证环境"]
-        direction LR
-        SourceCode[("Source Code<br/>源代码目录")]
-        QualityGate{"Quality Gate<br/>质量门禁"}
-    end
-
-    Human ==>|"下发任务"| Scheduler
-    Scheduler ---|"持久化状态"| StateDB
-
-    Scheduler -->|"调度"| Planner
-    Scheduler -->|"调度"| Coder
-    Scheduler -->|"调度"| Evaluator
-
-    Planner -->|"写入规格"| Spec
-    Coder -.->|"读取实现契约"| Spec
-    Evaluator -.->|"读取验收标准"| Spec
-
-    Coder -->|"修改"| SourceCode
-    Evaluator -.->|"只读检查"| SourceCode
-    Evaluator -->|"提交检查结果"| QualityGate
-
-    QualityGate -->|"FAIL"| Feedback
-    Coder -.->|"读取修复依据"| Feedback
-    QualityGate -->|"PASS"| PullRequest
-    Human ==>|"审核与批准"| PullRequest
-
-    classDef default fill:#ffffff,stroke:#18181b,stroke-width:1.5px,color:#18181b;
-    classDef control fill:#f4f4f5,stroke:#18181b,stroke-width:2px,color:#18181b;
-    classDef artifact fill:#fafafa,stroke:#52525b,stroke-width:1.5px,color:#18181b;
-    classDef gate fill:#ffffff,stroke:#18181b,stroke-width:2px,color:#18181b;
-
-    class Scheduler,StateDB control;
-    class Spec,Feedback,PullRequest,SourceCode artifact;
-    class QualityGate gate;
-
-    style HUMAN_DOMAIN fill:#fafafa,stroke:#a1a1aa,stroke-width:1px
-    style CONTROL_PLANE fill:#ffffff,stroke:#27272a,stroke-width:2px,stroke-dasharray:4 4
-    style AGENT_SANDBOXES fill:#ffffff,stroke:#27272a,stroke-width:2px,stroke-dasharray:4 4
-    style ARTIFACTS_ZONE fill:#fafafa,stroke:#a1a1aa,stroke-width:1px
-    style RUNTIME_ENVIRONMENT fill:#fafafa,stroke:#a1a1aa,stroke-width:1px
+```text
+mrg/
+├── README.md
+├── ARCHITECTURE.md
+└── skills/
+    └── architecture/
+        └── SKILL.md
 ```
 
-图中实线表示调度、状态变更或产物写入，虚线表示只读依赖，粗线表示需要人工参与的决策边界。隔离执行边界表达职责与上下文隔离；实际部署是否采用进程、容器或其他沙箱机制，由后续实现决定。
+仓库只提供一个架构 Skill，覆盖问题理解、架构判断、技术实现、验证和架构图一致性。
 
-## 工作流状态
+## 不预设的内容
 
-```mermaid
-stateDiagram-v2
-    [*] --> Planning
-    Planning --> Implementing: 规格已接受
-    Planning --> Blocked: 需求不完整
-    Implementing --> Evaluating: 已生成新版本
-    Implementing --> Blocked: 无法继续实现
-    Evaluating --> Implementing: 质量门禁失败且仍可重试
-    Evaluating --> AwaitingHuman: 质量门禁通过
-    Evaluating --> Blocked: 已达到重试上限
-    AwaitingHuman --> Implementing: 人工要求修改
-    AwaitingHuman --> Completed: 人工批准
-    Blocked --> Planning: 人工解除阻塞
-    Completed --> [*]
-```
+MRG 不强制使用 Planner、Coder、Reviewer、Evaluator 等 Agent 角色，不强制 spec、反馈日志、DAG、设计模式、DDD、Clean Architecture 或某种 Java 风格。
 
-状态标识 `Planning`、`Implementing`、`Evaluating`、`AwaitingHuman`、`Blocked` 和 `Completed` 是实现层使用的稳定值，不应随展示文案翻译。
+这些选择应由模型根据任务、代码事实、风险和人类约束自行判断。
 
-## 智能体契约
+## 运行时边界
 
-### 规划智能体
+运行时提供模型完成工作所需的真实能力：文件系统、Git、终端、构建与测试、源代码和项目上下文、架构产物、人类决策。
 
-- 读取需求及相关仓库上下文。
-- 编写 `spec.md`，内容包括范围、假设、验收标准、约束、受影响接口和验证方案。
-- 不修改生产代码。
-- 明确标记尚未确定的产品决策，不自行虚构需求。
+模型可以自行决定何时阅读、计划、修改、验证、绘图、回退或询问人类。
 
-### 编码智能体
+## 成功标准
 
-- 将已接受的 `spec.md` 作为实现契约。
-- 只修改规格要求的文件，并遵守 `skills/architecture-first-engineering/SKILL.md`。
-- 执行验证方案中指定的检查，并记录命令结果。
-- 不得为了获得通过结果而削弱测试或质量门禁。
-
-### 评估智能体
-
-- 根据规格和可观察行为独立审核实现。
-- 独立执行测试、静态分析和针对性检查，不直接采信编码智能体的报告。
-- 编写 `review-feedback.md`；每个失败项必须包含严重程度、文件或位置、证据和明确的预期结果。
-- 只有全部验收标准和必需检查均通过时才能返回通过。
-- 以评估智能体身份工作时不修改生产代码。
-
-### 人工审核者
-
-- 解决不明确的需求、批准例外，并负责最终合并决策。
-- 任何通过质量门禁的版本仍需人工审核后才能合并或发布。
-
-## 调度器职责
-
-调度器负责流程编排，不承载业务逻辑。它必须：
-
-1. 持久化当前状态、尝试次数、产物和命令结果。
-2. 仅向每个智能体提供其契约声明的输入。
-3. 在状态推进前验证必需产物。
-4. 应用可配置的重试上限，并在连续失败后停止。
-5. 保存完整执行日志，同时移除密钥和凭据。
-6. 在合并、部署或其他不可逆操作前要求人工批准。
-
-## 产物规范
-
-`spec.md` 必须包含：
-
-- 问题描述和期望行为
-- 范围内与范围外工作
-- 假设和待确认问题
-- 以可观察结果表述的验收标准
-- 技术约束和受影响接口
-- 验证命令或检查项
-
-`review-feedback.md` 必须包含：
-
-- 总体结果：`PASS` 或 `FAIL`
-- 已执行的检查及其结果
-- 按严重程度排序的问题
-- 每个失败项的证据和复现步骤
-- 剩余风险或跳过的检查
-
-## 质量门禁
-
-只有同时满足以下条件，版本才能通过：全部验收标准已满足；必需检查成功退出；不存在尚未解决的高严重程度问题；没有跳过必需验证。缺少证据时，调度器必须判定失败，不得默认通过。
-
-## 变更规则
-
-当智能体职责、工作流状态、产物契约、审批边界或质量门禁发生变化时，必须在同一次变更中更新本文档。只要这些契约保持不变，实现细节可以独立演进。
+MRG 的目标不是让模型遵循更多规则，而是在足够上下文下观察模型能否正确理解系统、为复杂问题设计合理结构、对简单问题保持简单、将设计自然落到代码，并让架构图与实现保持一致。
